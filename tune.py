@@ -30,7 +30,7 @@ PLOTS_DIR = Path('plots')
 
 
 def save_plot(filename):
-    '''Saves the current matplotlib figure to PLOTS_DIR and displays it.'''
+    # Saves the current matplotlib figure to PLOTS_DIR and displays it.
     plt.tight_layout()
     plt.savefig(PLOTS_DIR / filename, dpi=200, bbox_inches='tight')
     plt.show()
@@ -38,7 +38,7 @@ def save_plot(filename):
 
 
 def plot_random_forest(results, name):
-    '''Plots F1 vs number of trees, with one line per max_depth value.'''
+    # Plots F1 vs number of trees, with one line per max_depth value.
     results['trees'] = results['param_model__n_estimators'].astype(int)
     results['max_depth'] = results['param_model__max_depth'].astype(str)
 
@@ -51,7 +51,7 @@ def plot_random_forest(results, name):
 
 
 def plot_svm(results, name):
-    '''Plots F1 vs C, with one line per gamma value.'''
+    # Plots F1 vs C, with one line per gamma value.
     results['C'] = results['param_model__C'].astype(float)
     results['gamma'] = results['param_model__gamma'].astype(str)
 
@@ -71,7 +71,7 @@ PLOT_FUNCTIONS = {
 
 
 def tune_model(name, grid_params, X, y):
-    '''Runs GridSearchCV for a single model and returns its cv_results_ as a dataframe.'''
+    # Runs GridSearchCV for a single model and returns its cv_results_ as a dataframe.
     grid = GridSearchCV(
         make_pipeline(get_models()[name]), grid_params,
         scoring='f1_macro', cv=CV, refit=True,

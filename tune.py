@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.model_selection import StratifiedKFold, GridSearchCV
 from dataset import scan_files, build_dataframe, dataframe_to_arrays
-from model_utils import get_models, make_pipeline
+from model_utils import get_models, make_pipeline, get_train_test_split
 
 '''
 Hyperparameter search (GridSearchCV) for random_forest and svm_rbf, the two
@@ -95,11 +95,11 @@ def main():
     movements = scan_files(Path('d02_processed_data'))
     df = build_dataframe(movements)
     X, y = dataframe_to_arrays(df)
-    print(f'Dataset: {X.shape[0]} samples, {X.shape[1]} features, {len(np.unique(y))} classes\n')
-
+    X_train, X_test, y_train, y_test = get_train_test_split(X, y)
+    print(f'Dataset: {X.shape[0]} samples total ({X_train.shape[0]} train / {X_test.shape[0]} test held out), {X.shape[1]} features, {len(np.unique(y))} classes\n')
     for name, grid_params in PARAM_GRIDS.items():
         print(f'GridSearchCV: {name}')
-        results = tune_model(name, grid_params, X, y)
+        results = tune_model(name, grid_params, X_train, y_train)
         PLOT_FUNCTIONS[name](results, name)
 
     print(f'Plots saved to {PLOTS_DIR}/')

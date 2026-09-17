@@ -1,21 +1,22 @@
-
 from pathlib import Path
 import numpy as np
 import pandas as pd
 from dataset import scan_files, build_dataframe, dataframe_to_arrays
-from model_utils import get_models, make_pipeline, evaluate_with_cv
+from model_utils import get_models, make_pipeline, evaluate_with_cv, get_train_test_split
 
 # Cross validation comparison of 6 classical models (accuracy, precision, recall, f1, fit_time).
 def main():
     movements = scan_files(Path('d02_processed_data'))
     df = build_dataframe(movements)
     X, y = dataframe_to_arrays(df)
-    print(f'Dataset: {X.shape[0]} samples, {X.shape[1]} features, {len(np.unique(y))} classes\n')
-
+    X_train, X_test, y_train, y_test = get_train_test_split(X, y)
+    
+    print(f'Dataset: {X.shape[0]} samples total ({X_train.shape[0]} train / {X_test.shape[0]} test held out), {X.shape[1]} features, {len(np.unique(y))} classes\n')
+    
     rows = []
     for name, model in get_models().items():
         pipeline = make_pipeline(model)
-        metrics = evaluate_with_cv(pipeline, X, y)
+        metrics = evaluate_with_cv(pipeline, X_train, y_train)
         metrics['model'] = name
         rows.append(metrics)
         print(f"{name:<22} f1={metrics['f1']:.4f}  acc={metrics['accuracy']:.4f}  "

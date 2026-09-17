@@ -4,7 +4,7 @@ we will first compare all models using standard parameters, and after identifyin
 we will fine-tune them to determine which model offers the best classification performance for the project.
 '''
 
-from sklearn.model_selection import StratifiedKFold, cross_validate
+from sklearn.model_selection import StratifiedKFold, cross_validate, train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.feature_selection import SelectKBest, f_classif
@@ -17,6 +17,10 @@ from sklearn.naive_bayes import GaussianNB
 
 SCORING = ['accuracy', 'precision_macro', 'recall_macro', 'f1_macro']
 
+def get_train_test_split(X, y, test_size=0.2, seed=42):
+     return train_test_split(X, y, test_size=test_size, random_state=seed, stratify=y)
+
+
 # Returns the available untrained models in a dictionary
 def get_models():
     return {
@@ -24,7 +28,8 @@ def get_models():
         'decision_tree': DecisionTreeClassifier(max_depth=10, random_state=42),
         'random_forest': RandomForestClassifier(n_estimators=300, random_state=42),
         'svm_rbf': SVC(kernel='rbf', C=1.0, gamma='scale'),
-        'logistic_regression': LogisticRegression(max_iter=2000),
+        # regularización L2 (Ridge)
+        'logistic_regression': LogisticRegression(max_iter=2000, penalty='l2', C=1.0),
         'naive_bayes': GaussianNB(),
     }
 

@@ -24,13 +24,13 @@ def get_train_test_split(X, y, test_size=0.2, seed=42):
 # Returns the available untrained models in a dictionary
 def get_models():
     return {
-        'knn': KNeighborsClassifier(n_neighbors=5),#Controla la suavidad de la frontera
-        'decision_tree': DecisionTreeClassifier(max_depth=10, random_state=42), #max_depth limita la complejidad del árbol (regularización)
-        'random_forest': RandomForestClassifier(n_estimators=300, max_depth=10, random_state=42), #max_depth regulariza cada árbol, n_estimators estabiliza el ensamble
-        'svm_rbf': SVC(kernel='rbf', C=1.0, gamma='scale'),#C controla el margen de la frontera
-        #regularización L2 (Ridge),
+        'knn': KNeighborsClassifier(n_neighbors=5), #controls the smoothness of the decision boundary
+        'decision_tree': DecisionTreeClassifier(max_depth=10, random_state=42), #max_depth limits the tree's complexity (regularization)
+        'random_forest': RandomForestClassifier(n_estimators=300, max_depth=10, random_state=42), #max_depth regularizes each tree, n_estimators stabilizes the ensemble
+        'svm_rbf': SVC(kernel='rbf', C=1.0, gamma='scale'), #C controls the decision boundary margin
+        #L2 (Ridge) regularization
         'logistic_regression': LogisticRegression(max_iter=2000, penalty='l2', C=1.0),
-        'naive_bayes': GaussianNB(var_smoothing=1e-9),# suaviza la varianza para evitar inestabilidad numérica
+        'naive_bayes': GaussianNB(var_smoothing=1e-9), #smooths the variance to avoid numerical instability
     }
 
 # Builds a pipeline with scaling, optional feature selection, and model.

@@ -24,13 +24,13 @@ def get_train_test_split(X, y, test_size=0.2, seed=42):
 # Returns the available untrained models in a dictionary
 def get_models():
     return {
-        'knn': KNeighborsClassifier(n_neighbors=5),
-        'decision_tree': DecisionTreeClassifier(max_depth=10, random_state=42),
-        'random_forest': RandomForestClassifier(n_estimators=300, random_state=42),
-        'svm_rbf': SVC(kernel='rbf', C=1.0, gamma='scale'),
-        # regularización L2 (Ridge)
+        'knn': KNeighborsClassifier(n_neighbors=5),#Controla la suavidad de la frontera
+        'decision_tree': DecisionTreeClassifier(max_depth=10, random_state=42), #max_depth limita la complejidad del árbol (regularización)
+        'random_forest': RandomForestClassifier(n_estimators=300, max_depth=10, random_state=42), #max_depth regulariza cada árbol, n_estimators estabiliza el ensamble
+        'svm_rbf': SVC(kernel='rbf', C=1.0, gamma='scale'),#C controla el margen de la frontera
+        #regularización L2 (Ridge),
         'logistic_regression': LogisticRegression(max_iter=2000, penalty='l2', C=1.0),
-        'naive_bayes': GaussianNB(),
+        'naive_bayes': GaussianNB(var_smoothing=1e-9),# suaviza la varianza para evitar inestabilidad numérica
     }
 
 # Builds a pipeline with scaling, optional feature selection, and model.

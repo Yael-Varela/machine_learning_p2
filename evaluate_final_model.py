@@ -1,10 +1,13 @@
 from pathlib import Path
+import json
+
 import numpy as np
 import joblib
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
+from sklearn.metrics import (accuracy_score, precision_score, recall_score,
+                             f1_score, confusion_matrix)
 from dataset import scan_files, build_dataframe, dataframe_to_arrays
 from model_utils import get_train_test_split
 
@@ -13,7 +16,7 @@ from model_utils import get_train_test_split
 MODEL = RandomForestClassifier(n_estimators=200, max_depth=20, random_state=67)
 MODEL_PATH = Path('final_model.joblib')
 SCALER_PATH = Path('final_scaler.joblib')
-FULL_TEST_PATH = Path('full_test_predictions.npz')
+WEB_DATA_PATH = Path('datos.js')
 TEST_SUBSETS_DIR = Path('test_subsets_by_class')
 
 # thresholds used only to turn the train/test gap into a readable label
@@ -54,16 +57,51 @@ def diagnose(train_f1, test_f1):
     return bias, variance, fit, gap
 
 
-def save_full_test_predictions(y_test, test_pred):
+def all_metrics(y_true, y_pred):
     '''
-    Receives the true labels and predictions for the WHOLE test set (all
-    classes together, not split apart) and saves both arrays to
-    FULL_TEST_PATH. Needed for per-class precision/recall later on, since
-    those need to see false positives coming from every other class, not
-    just the one being inspected.
+    Returns the four evaluation metrics in a dictionary, already rounded,
+    so train and test can be compared side by side.
     '''
-    np.savez(FULL_TEST_PATH, y_true=y_test, y_pred=test_pred)
-    print(f'Full test set predictions saved to {FULL_TEST_PATH}')
+    return {
+        'accuracy': round(float(accuracy_score(y_true, y_pred)), 4),
+        'precision': round(float(precision_score(y_true, y_pred, average='macro', zero_division=0)), 4),
+        'recall': round(float(recall_score(y_true, y_pred, average='macro', zero_division=0)), 4),
+        'f1': round(float(f1_score(y_true, y_pred, average='macro')), 4),
+    }
+
+
+def save_web_data(y_train, train_pred, y_test, test_pred, labels):
+    '''
+    Writes WEB_DATA_PATH, a small JavaScript file that resultados.html
+    reads directly, so no conversion step is needed. It stores the train
+    and test metrics, the bias/variance diagnosis and the confusion matrix
+    of the test set. Everything is computed here with sklearn so the page
+    shows exactly the same numbers printed above.
+    '''
+    train = all_metrics(y_train, train_pred)
+    test = all_metrics(y_test, test_pred)
+    bias, variance, fit, gap = diagnose(train['f1'], test['f1'])
+    matrix = confusion_matrix(y_test, test_pred, labels=labels)
+
+    data = {
+        'clases': [int(c) for c in labels],
+        'n_train': int(len(y_train)),
+        'n_test': int(len(y_test)),
+        'train': train,
+        'test': test,
+        'gap': round(float(gap), 4),
+        'bias': bias,
+        'variance': variance,
+        'fit': fit,
+        'matriz': [[int(v) for v in row] for row in matrix],
+    }
+
+    with open(WEB_DATA_PATH, 'w') as f:
+        f.write('var DATOS = ')
+        json.dump(data, f)
+        f.write(';\n')
+
+    print(f'Web data saved to {WEB_DATA_PATH}')
 
 
 def save_test_subsets_by_class(X_test, y_test):
@@ -137,7 +175,7 @@ def main():
     print(f'\nModel saved to {MODEL_PATH}')
     print(f'Scaler saved to {SCALER_PATH}')
 
-    save_full_test_predictions(y_test, test_pred)
+    save_web_data(y_train, train_pred, y_test, test_pred, labels)
 
     print(f'\nSaving test set split by class to {TEST_SUBSETS_DIR}/')
     save_test_subsets_by_class(X_test, y_test)

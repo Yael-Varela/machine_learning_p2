@@ -2,7 +2,6 @@ from pathlib import Path
 import json
 
 import numpy as np
-import joblib
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
@@ -14,10 +13,7 @@ from model_utils import get_train_test_split
 # Using our best model with the tunned hyperparameters.
  
 MODEL = RandomForestClassifier(n_estimators=200, max_depth=20, random_state=67)
-MODEL_PATH = Path('final_model.joblib')
-SCALER_PATH = Path('final_scaler.joblib')
 WEB_DATA_PATH = Path('datos.js')
-TEST_SUBSETS_DIR = Path('test_subsets_by_class')
 
 # thresholds used only to turn the train/test gap into a readable label
 BIAS_THRESHOLD = 0.85   # below this will be consider as 'high bias'
@@ -104,24 +100,6 @@ def save_web_data(y_train, train_pred, y_test, test_pred, labels):
     print(f'Web data saved to {WEB_DATA_PATH}')
 
 
-def save_test_subsets_by_class(X_test, y_test):
-    '''
-    Receives the raw (unscaled) test features and labels, splits them by
-    class, and saves one .npz file per class, so an interface can demo one
-    exercise at a time. This is only for the demo'''
-    TEST_SUBSETS_DIR.mkdir(exist_ok=True)
-    classes = np.unique(y_test)
-
-    for exercise in classes:
-        mask = y_test == exercise
-        X_exercise = X_test[mask]
-        y_exercise = y_test[mask]
-
-        out_path = TEST_SUBSETS_DIR / f'class_{exercise:02d}.npz'
-        np.savez(out_path, X=X_exercise, y=y_exercise)
-        print(f'  class {exercise:02d}: {X_exercise.shape[0]} samples -> {out_path}')
-
-
 def main():
     movements = scan_files(Path('d02_processed_data'))
     df = build_dataframe(movements)
@@ -170,15 +148,8 @@ def main():
     labels = sorted(np.unique(y))
     print(confusion_matrix(y_test, test_pred, labels=labels))
 
-    joblib.dump(model, MODEL_PATH)
-    joblib.dump(scaler, SCALER_PATH)
-    print(f'\nModel saved to {MODEL_PATH}')
-    print(f'Scaler saved to {SCALER_PATH}')
-
+    print()
     save_web_data(y_train, train_pred, y_test, test_pred, labels)
-
-    print(f'\nSaving test set split by class to {TEST_SUBSETS_DIR}/')
-    save_test_subsets_by_class(X_test, y_test)
 
 if __name__ == '__main__':
     main()

@@ -3,7 +3,9 @@ import json
 
 import numpy as np
 
+from sklearn.base import clone
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import (accuracy_score, precision_score, recall_score,
                              f1_score, confusion_matrix)
@@ -14,6 +16,7 @@ from model_utils import get_train_test_split
  
 MODEL = RandomForestClassifier(n_estimators=200, max_depth=20, random_state=67)
 WEB_DATA_PATH = Path('datos.js')
+CURVE_STEPS = 10   # how many points the learning curves have
 
 # thresholds used only to turn the train/test gap into a readable label
 BIAS_THRESHOLD = 0.85   # below this will be consider as 'high bias'
@@ -53,6 +56,61 @@ def diagnose(train_f1, test_f1):
     return bias, variance, fit, gap
 
 
+def squared_error(model, X, y):
+    '''
+    Mean squared error between the probabilities the model gives to each
+    class and the correct answer (1 for the true class, 0 for the rest).
+    This is how the error is measured for a classifier, since the labels
+    are not numbers you can subtract.
+    '''
+    proba = model.predict_proba(X)
+    target = np.zeros_like(proba)
+    positions = {label: i for i, label in enumerate(model.classes_)}
+    for row, label in enumerate(y):
+        target[row, positions[label]] = 1
+    return float(np.mean(np.sum((proba - target) ** 2, axis=1)))
+
+
+def learning_curves(X_train, y_train, X_test, y_test):
+    '''
+    Trains the same model again and again with a growing slice of the
+    training set, and measures F1 and error on train and test every time.
+    This is what shows how far apart the two curves stay and whether more
+    data would still help.
+    '''
+    sizes, f1_train, f1_test, error_train, error_test = [], [], [], [], []
+
+    for step in range(1, CURVE_STEPS + 1):
+        fraction = step / CURVE_STEPS
+
+        # a stratified slice, so every exercise keeps its proportion
+        if fraction < 1:
+            index, _ = train_test_split(np.arange(len(y_train)), train_size=fraction,
+                                        random_state=67, stratify=y_train)
+        else:
+            index = np.arange(len(y_train))
+
+        X_part, y_part = X_train[index], y_train[index]
+
+        model = clone(MODEL)
+        model.fit(X_part, y_part)
+
+        sizes.append(int(len(y_part)))
+        f1_train.append(round(float(f1_score(y_part, model.predict(X_part), average='macro')), 4))
+        f1_test.append(round(float(f1_score(y_test, model.predict(X_test), average='macro')), 4))
+        error_train.append(round(squared_error(model, X_part, y_part), 4))
+        error_test.append(round(squared_error(model, X_test, y_test), 4))
+
+        print(f'{len(y_part):>8}{f1_train[-1]:>12.4f}{f1_test[-1]:>10.4f}'
+              f'{error_train[-1]:>12.4f}{error_test[-1]:>10.4f}')
+
+    return {
+        'sizes': sizes,
+        'f1_train': f1_train, 'f1_test': f1_test,
+        'error_train': error_train, 'error_test': error_test,
+    }
+
+
 def all_metrics(y_true, y_pred):
     '''
     Returns the four evaluation metrics in a dictionary, already rounded,
@@ -66,7 +124,7 @@ def all_metrics(y_true, y_pred):
     }
 
 
-def save_web_data(y_train, train_pred, y_test, test_pred, labels):
+def save_web_data(y_train, train_pred, y_test, test_pred, labels, curves):
     '''
     Writes WEB_DATA_PATH, a small JavaScript file that resultados.html
     reads directly, so no conversion step is needed. It stores the train
@@ -90,6 +148,7 @@ def save_web_data(y_train, train_pred, y_test, test_pred, labels):
         'variance': variance,
         'fit': fit,
         'matriz': [[int(v) for v in row] for row in matrix],
+        'curvas': curves,
     }
 
     with open(WEB_DATA_PATH, 'w') as f:
@@ -148,8 +207,12 @@ def main():
     labels = sorted(np.unique(y))
     print(confusion_matrix(y_test, test_pred, labels=labels))
 
+    print('\nLearning curves (retraining with more data every step):')
+    print(f'{"samples":>8}{"f1 train":>12}{"f1 test":>10}{"err train":>12}{"err test":>10}')
+    curves = learning_curves(X_train_scaled, y_train, X_test_scaled, y_test)
+
     print()
-    save_web_data(y_train, train_pred, y_test, test_pred, labels)
+    save_web_data(y_train, train_pred, y_test, test_pred, labels, curves)
 
 if __name__ == '__main__':
     main()

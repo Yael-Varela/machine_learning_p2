@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Resultados del modelo</title>
+<style>
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: #ffffff;
+    color: #1c1c1c;
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+  }
+
+  .contenedor {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 32px 20px 60px;
+  }
+
+  h1 {
+    font-size: 22px;
+    font-weight: 600;
+    margin: 0 0 4px;
+  }
+
+  .resumen {
+    margin: 0 0 24px;
+    font-size: 14px;
+    color: #666;
+  }
+
+  .metricas {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 34px;
+  }
+
+  .metrica {
+    border: 1px solid #d8d8d8;
+    border-radius: 4px;
+    padding: 12px 14px;
+  }
+
+  .metrica span {
+    display: block;
+    font-size: 12px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .metrica strong {
+    font-size: 24px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  h2 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 2px;
+  }
+
+  .nota {
+    font-size: 13px;
+    color: #666;
+    margin: 0 0 14px;
+  }
+
+  .bloque { margin-bottom: 34px; }
+
+  .caja-canvas {
+    position: relative;
+    height: 300px;
+    border: 1px solid #cccccc;
+    border-radius: 3px;
+    padding: 12px;
+  }
+
+  .marco-matriz { overflow-x: auto; }
+
+  table {
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+    font-size: 12px;
+  }
+
+  th, td {
+    border: 1px solid #e0e0e0;
+    width: 34px;
+    height: 28px;
+    text-align: center;
+    padding: 0;
+  }
+
+  th {
+    color: #666;
+    font-weight: 600;
+    background: #fafafa;
+  }
+
+  th.esquina { background: #ffffff; border: none; }
+
+  .eje-x {
+    font-size: 12px;
+    color: #666;
+    margin: 0 0 4px 44px;
+  }
+
+  @media (max-width: 720px) {
+    .metricas { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div class="contenedor">
+
+  <h1>Resultados del modelo</h1>
+  <p class="resumen" id="resumen"></p>
+
+  <div class="metricas">
+    <div class="metrica"><span>Accuracy</span><strong id="valorAccuracy">-</strong></div>
+    <div class="metrica"><span>Precision</span><strong id="valorPrecision">-</strong></div>
+    <div class="metrica"><span>Recall</span><strong id="valorRecall">-</strong></div>
+    <div class="metrica"><span>F1</span><strong id="valorF1">-</strong></div>
+  </div>
+
+  <div class="bloque">
+    <h2>Entrenamiento vs prueba</h2>
+    <p class="nota" id="notaDiagnostico"></p>
+    <div class="caja-canvas"><canvas id="graficaComparacion"></canvas></div>
+  </div>
+
+  <div class="bloque">
+    <h2>Matriz de confusión</h2>
+    <p class="nota">
+      Cada renglón es el ejercicio real y cada columna el que predijo el modelo.
+      La diagonal azul son los aciertos, lo naranja son las confusiones.
+    </p>
+    <p class="eje-x">Predicho</p>
+    <div class="marco-matriz" id="marcoMatriz"></div>
+  </div>
+
+</div>
+
+<script src="datos.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+  var AZUL = "#1f77b4";
+  var NARANJA = "#ff7f0e";
+
+  document.getElementById("resumen").textContent =
+    "Entrenado con " + DATOS.n_train + " muestras (80%) y evaluado con las " +
+    DATOS.n_test + " muestras de prueba (20%) que el modelo nunca vio. " +
+    DATOS.clases.length + " ejercicios.";
+
+  // Las tarjetas de arriba muestran las métricas de prueba, que son las
+  // que dicen qué tan bien generaliza el modelo
+  document.getElementById("valorAccuracy").textContent = DATOS.test.accuracy.toFixed(4);
+  document.getElementById("valorPrecision").textContent = DATOS.test.precision.toFixed(4);
+  document.getElementById("valorRecall").textContent = DATOS.test.recall.toFixed(4);
+  document.getElementById("valorF1").textContent = DATOS.test.f1.toFixed(4);
+
+  document.getElementById("notaDiagnostico").textContent =
+    "Diferencia de F1 entre entrenamiento y prueba: " + DATOS.gap.toFixed(4) +
+    ". Sesgo " + DATOS.bias + ", varianza " + DATOS.variance + " (" + DATOS.fit + ").";
+
+  function dibujarComparacion() {
+    new Chart(document.getElementById("graficaComparacion"), {
+      type: "bar",
+      data: {
+        labels: ["Accuracy", "Precision", "Recall", "F1"],
+        datasets: [
+          {
+            label: "Entrenamiento",
+            data: [DATOS.train.accuracy, DATOS.train.precision, DATOS.train.recall, DATOS.train.f1],
+            backgroundColor: AZUL,
+            borderWidth: 0
+          },
+          {
+            label: "Prueba",
+            data: [DATOS.test.accuracy, DATOS.test.precision, DATOS.test.recall, DATOS.test.f1],
+            backgroundColor: NARANJA,
+            borderWidth: 0
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: "top" } },
+        scales: {
+          x: {
+            ticks: { color: "#333", font: { size: 12 } },
+            grid: { display: false },
+            border: { color: "#333" }
+          },
+          y: {
+            title: { display: true, text: "Valor", color: "#333", font: { size: 12 } },
+            ticks: { color: "#333", font: { size: 11 } },
+            grid: { color: "#e5e5e5" },
+            border: { color: "#333" },
+            min: 0.8,
+            max: 1
+          }
+        }
+      }
+    });
+  }
+
+  // Matriz de confusión: se arma como tabla y cada celda se pinta más
+  // fuerte mientras más muestras tenga
+  function armarMatriz() {
+    var tabla = document.createElement("table");
+
+    var encabezado = document.createElement("tr");
+    var esquina = document.createElement("th");
+    esquina.className = "esquina";
+    esquina.textContent = "Real";
+    encabezado.appendChild(esquina);
+
+    for (var c = 0; c < DATOS.clases.length; c++) {
+      var th = document.createElement("th");
+      th.textContent = DATOS.clases[c];
+      encabezado.appendChild(th);
+    }
+    tabla.appendChild(encabezado);
+
+    for (var i = 0; i < DATOS.clases.length; i++) {
+      var fila = document.createElement("tr");
+
+      var etiqueta = document.createElement("th");
+      etiqueta.textContent = DATOS.clases[i];
+      fila.appendChild(etiqueta);
+
+      // el total del renglón sirve para saber qué tan fuerte pintar
+      var total = 0;
+      for (var k = 0; k < DATOS.clases.length; k++) total += DATOS.matriz[i][k];
+
+      for (var j = 0; j < DATOS.clases.length; j++) {
+        var valor = DATOS.matriz[i][j];
+        var celda = document.createElement("td");
+        celda.textContent = valor === 0 ? "" : valor;
+
+        if (valor > 0) {
+          var intensidad = valor / total;
+          var color = i === j ? AZUL : NARANJA;
+          // los errores son poquitos, si no casi no se verían
+          var opacidad = i === j ? 0.15 + 0.75 * intensidad : 0.30 + 0.60 * intensidad;
+          celda.style.backgroundColor = color;
+          celda.style.opacity = opacidad;
+          celda.style.color = opacidad > 0.6 ? "#ffffff" : "#1c1c1c";
+        }
+
+        celda.title = "Real " + DATOS.clases[i] + ", predicho " + DATOS.clases[j] + ": " + valor;
+        fila.appendChild(celda);
+      }
+      tabla.appendChild(fila);
+    }
+
+    document.getElementById("marcoMatriz").appendChild(tabla);
+  }
+
+  dibujarComparacion();
+  armarMatriz();
+</script>
+
+</body>
+</html>

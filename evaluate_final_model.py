@@ -92,6 +92,15 @@ def main():
     X_train, X_test, y_train, y_test = get_train_test_split(X, y)
     print(f'Train: {X_train.shape[0]} samples   Test: {X_test.shape[0]} samples (held out, unseen until now)\n')
 
+   # Z-Score 
+    mean = X_train.mean(axis=0)
+    std = X_train.std(axis=0)
+    lower, upper = mean - 3 * std, mean + 3 * std
+    outliers = ((X_train < lower) | (X_train > upper)).sum()
+    print(f'Z-Score: {outliers} values clipped in train ({outliers / X_train.size * 100:.4f}%)')
+    X_train = np.clip(X_train, lower, upper)
+    X_test = np.clip(X_test, lower, upper)
+ 
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)

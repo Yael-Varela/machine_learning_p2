@@ -133,6 +133,23 @@ def main():
     print(f'\nSaving test set split by class to {TEST_SUBSETS_DIR}/')
     save_test_subsets_by_class(X_test, y_test)
 
+    # IQR
+    q1, q3 = np.percentile(X_train, [25, 75], axis=0)
+    iqr = q3 - q1
+    lower, upper = q1 - 1.5 * iqr, q3 + 1.5 * iqr
+    X_train = np.clip(X_train, lower, upper)
+    X_test = np.clip(X_test, lower, upper)
+ 
+    joblib.dump((lower, upper), 'final_iqr_limits.joblib')
+
+    # Z-Score 
+    mean = X_train.mean(axis=0)
+    std = X_train.std(axis=0)
+    lower, upper = mean - 3 * std, mean + 3 * std
+    outliers = ((X_train < lower) | (X_train > upper)).sum()
+    print(f'Z-Score: {outliers} values clipped in train ({outliers / X_train.size * 100:.4f}%)')
+    X_train = np.clip(X_train, lower, upper)
+    X_test = np.clip(X_test, lower, upper)
 
 if __name__ == '__main__':
     main()

@@ -25,7 +25,7 @@ PARAM_GRIDS = {
     },
 }
 
-CV = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+CV = StratifiedKFold(n_splits=5, shuffle=True, random_state=67)
 PLOTS_DIR = Path('plots')
 
 

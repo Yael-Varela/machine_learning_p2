@@ -17,7 +17,15 @@ from sklearn.naive_bayes import GaussianNB
 
 SCORING = ['accuracy', 'precision_macro', 'recall_macro', 'f1_macro']
 
-def get_train_test_split(X, y, test_size=0.2, seed=42):
+'''
+Receives the full X and y arrays and, according to a test_size ratio,
+splits them once into train and test (80/20 by default), stratified so
+every class keeps its proportion in both sides. Returns X_train, X_test,
+y_train, y_test. Every script calls this with the same seed/test_size,
+so they all get the identical split, keeping the test portion unseen
+until we evaluate the final model (the choosen one)'''
+
+def get_train_test_split(X, y, test_size=0.2, seed=67):
      return train_test_split(X, y, test_size=test_size, random_state=seed, stratify=y)
 
 
@@ -26,7 +34,7 @@ def get_models():
     return {
         'knn': KNeighborsClassifier(n_neighbors=5), #controls the smoothness of the decision boundary
         'decision_tree': DecisionTreeClassifier(max_depth=10, random_state=42), #max_depth limits the tree's complexity (regularization)
-        'random_forest': RandomForestClassifier(n_estimators=300, max_depth=10, random_state=42), #max_depth regularizes each tree, n_estimators stabilizes the ensemble
+        'random_forest': RandomForestClassifier(n_estimators=200, max_depth=20, random_state=42), #max_depth regularizes each tree, n_estimators stabilizes the ensemble
         'svm_rbf': SVC(kernel='rbf', C=1.0, gamma='scale'), #C controls the decision boundary margin
         #L2 (Ridge) regularization
         'logistic_regression': LogisticRegression(max_iter=2000, penalty='l2', C=1.0),

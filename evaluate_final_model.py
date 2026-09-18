@@ -1,31 +1,33 @@
-
 from pathlib import Path
-
 import numpy as np
 import joblib
+
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score, f1_score
-
+from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
 from dataset import scan_files, build_dataframe, dataframe_to_arrays
 from model_utils import get_train_test_split
 
-FINAL_MODEL = RandomForestClassifier(n_estimators=200, max_depth=20, random_state=67)
-
+# Using our best model with the tunned hyperparameters.
+ 
+MODEL = RandomForestClassifier(n_estimators=200, max_depth=20, random_state=67)
 MODEL_PATH = Path('final_model.joblib')
 SCALER_PATH = Path('final_scaler.joblib')
 FULL_TEST_PATH = Path('full_test_predictions.npz')
 TEST_SUBSETS_DIR = Path('test_subsets_by_class')
 
-# thresholds used only to turn the train/test gap into a readable label;
-# adjust if your own results call for a different cutoff
-BIAS_THRESHOLD = 0.85   # below this train score -> considered high bias
+# thresholds used only to turn the train/test gap into a readable label
+BIAS_THRESHOLD = 0.85   # below this will be consider as 'high bias'
 GAP_THRESHOLD_LOW = 0.03
 GAP_THRESHOLD_HIGH = 0.08
 
 
 def diagnose(train_f1, test_f1):
-    '''Turns train/test F1 scores into a bias/variance/fit diagnosis.'''
+    '''
+    Receives the train and test F1 scores, computes the gap between them,
+    and classifies bias, variance and overall fit from that gap. Returns
+    (bias, variance, fit, gap).
+    '''
     gap = train_f1 - test_f1
 
     if train_f1 < BIAS_THRESHOLD:
@@ -52,24 +54,34 @@ def diagnose(train_f1, test_f1):
     return bias, variance, fit, gap
 
 
+def save_full_test_predictions(y_test, test_pred):
+    '''
+    Receives the true labels and predictions for the WHOLE test set (all
+    classes together, not split apart) and saves both arrays to
+    FULL_TEST_PATH. Needed for per-class precision/recall later on, since
+    those need to see false positives coming from every other class, not
+    just the one being inspected.
+    '''
+    np.savez(FULL_TEST_PATH, y_true=y_test, y_pred=test_pred)
+    print(f'Full test set predictions saved to {FULL_TEST_PATH}')
+
+
 def save_test_subsets_by_class(X_test, y_test):
     '''
-    Splits the held-out test set into one subset per class (movement_id)
-    and saves each as a separate .npz file (RAW, unscaled features), so an
-    interface can load one class at a time, apply the saved scaler itself,
-    and run predictions on it.
-    '''
+    Receives the raw (unscaled) test features and labels, splits them by
+    class, and saves one .npz file per class, so an interface can demo one
+    exercise at a time. This is only for the demo'''
     TEST_SUBSETS_DIR.mkdir(exist_ok=True)
     classes = np.unique(y_test)
 
-    for cls in classes:
-        mask = y_test == cls
-        X_cls = X_test[mask]
-        y_cls = y_test[mask]
+    for exercise in classes:
+        mask = y_test == exercise
+        X_exercise = X_test[mask]
+        y_exercise = y_test[mask]
 
-        out_path = TEST_SUBSETS_DIR / f'class_{cls:02d}.npz'
-        np.savez(out_path, X=X_cls, y=y_cls)
-        print(f'  class {cls:02d}: {X_cls.shape[0]} samples -> {out_path}')
+        out_path = TEST_SUBSETS_DIR / f'class_{exercise:02d}.npz'
+        np.savez(out_path, X=X_exercise, y=y_exercise)
+        print(f'  class {exercise:02d}: {X_exercise.shape[0]} samples -> {out_path}')
 
 
 def main():
@@ -77,8 +89,6 @@ def main():
     df = build_dataframe(movements)
     X, y = dataframe_to_arrays(df)
 
-    # same seed/test_size as the other scripts -> identical split, so this
-    # test set was never seen during model comparison or tuning
     X_train, X_test, y_train, y_test = get_train_test_split(X, y)
     print(f'Train: {X_train.shape[0]} samples   Test: {X_test.shape[0]} samples (held out, unseen until now)\n')
 
@@ -86,7 +96,7 @@ def main():
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
 
-    model = FINAL_MODEL
+    model = MODEL
     model.fit(X_train_scaled, y_train)
 
     train_pred = model.predict(X_train_scaled)
@@ -107,23 +117,19 @@ def main():
     print(f'variance: {variance}')
     print(f'fit: {fit}')
 
-    # ---- save everything the interface needs ----
+    # full test set together (all 15 classes), not split apart -- this is
+    # what tells you WHICH classes get confused with which
+    print('\nConfusion matrix (rows=true, columns=predicted):')
+    labels = sorted(np.unique(y))
+    print(confusion_matrix(y_test, test_pred, labels=labels))
 
-    # trained model + scaler, so the interface can load them without retraining
     joblib.dump(model, MODEL_PATH)
     joblib.dump(scaler, SCALER_PATH)
     print(f'\nModel saved to {MODEL_PATH}')
     print(f'Scaler saved to {SCALER_PATH}')
 
-    # predictions on the FULL test set: required to compute correct
-    # precision/recall per class later (precision needs to know about
-    # false positives coming from OTHER classes, which are invisible if
-    # you only look at one class's subset in isolation)
-    np.savez(FULL_TEST_PATH, y_true=y_test, y_pred=test_pred)
-    print(f'Full test set predictions saved to {FULL_TEST_PATH}')
+    save_full_test_predictions(y_test, test_pred)
 
-    # RAW (unscaled) test set split by class, for the interface to demo
-    # predictions one exercise at a time
     print(f'\nSaving test set split by class to {TEST_SUBSETS_DIR}/')
     save_test_subsets_by_class(X_test, y_test)
 

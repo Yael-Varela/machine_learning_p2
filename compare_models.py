@@ -8,6 +8,7 @@ from model_utils import get_models, make_pipeline, evaluate_with_cv, get_train_t
 def main():
     movements = scan_files(Path('d02_processed_data'))
     df = build_dataframe(movements)
+    print(df.head())
     X, y = dataframe_to_arrays(df)
     X_train, X_test, y_train, y_test = get_train_test_split(X, y)
     

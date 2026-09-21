@@ -7,13 +7,11 @@ from sklearn.base import clone
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import (accuracy_score, precision_score, recall_score,
-                             f1_score, confusion_matrix)
+from sklearn.metrics import (accuracy_score, precision_score, recall_score,f1_score, confusion_matrix)
 from dataset import scan_files, build_dataframe, dataframe_to_arrays
 from model_utils import get_train_test_split
 
 # Using our best model with the tunned hyperparameters.
- 
 MODEL = RandomForestClassifier(n_estimators=200, max_depth=20, random_state=67)
 WEB_DATA_PATH = Path('datos.js')
 CURVE_STEPS = 10   # how many points the learning curves have
@@ -85,8 +83,7 @@ def learning_curves(X_train, y_train, X_test, y_test):
 
         # a stratified slice, so every exercise keeps its proportion
         if fraction < 1:
-            index, _ = train_test_split(np.arange(len(y_train)), train_size=fraction,
-                                        random_state=67, stratify=y_train)
+            index, _ = train_test_split(np.arange(len(y_train)), train_size=fraction, random_state=67, stratify=y_train)
         else:
             index = np.arange(len(y_train))
 
@@ -114,35 +111,40 @@ def learning_curves(X_train, y_train, X_test, y_test):
 def all_metrics(y_true, y_pred):
     '''
     Returns the four evaluation metrics in a dictionary, already rounded,
-    so train and test can be compared side by side.
+    plus the raw count of correct and incorrect predictions, so train and
+    test can be compared side by side.
     '''
+    correct = int((np.asarray(y_true) == np.asarray(y_pred)).sum())
+    total = len(y_true)
     return {
         'accuracy': round(float(accuracy_score(y_true, y_pred)), 4),
         'precision': round(float(precision_score(y_true, y_pred, average='macro', zero_division=0)), 4),
         'recall': round(float(recall_score(y_true, y_pred, average='macro', zero_division=0)), 4),
         'f1': round(float(f1_score(y_true, y_pred, average='macro')), 4),
+        'correct': correct,
+        'incorrect': total - correct,
+        'total': total,
     }
 
 
-def save_web_data(y_train, train_pred, y_test, test_pred, labels, curves):
+def save_web_data(train_metrics, test_metrics, y_test, test_pred, labels, curves):
     '''
-    Writes WEB_DATA_PATH, a small JavaScript file that resultados.html
+    Writes WEB_DATA_PATH, a small JavaScript file that the html
     reads directly, so no conversion step is needed. It stores the train
-    and test metrics, the bias/variance diagnosis and the confusion matrix
-    of the test set. Everything is computed here with sklearn so the page
-    shows exactly the same numbers printed above.
+    and test metrics (including correct/incorrect counts), the
+    bias/variance diagnosis and the confusion matrix of the test set.
+    Everything is computed here with sklearn so the page shows exactly the
+    same numbers printed above.
     '''
-    train = all_metrics(y_train, train_pred)
-    test = all_metrics(y_test, test_pred)
-    bias, variance, fit, gap = diagnose(train['f1'], test['f1'])
+    bias, variance, fit, gap = diagnose(train_metrics['f1'], test_metrics['f1'])
     matrix = confusion_matrix(y_test, test_pred, labels=labels)
 
     data = {
         'clases': [int(c) for c in labels],
-        'n_train': int(len(y_train)),
-        'n_test': int(len(y_test)),
-        'train': train,
-        'test': test,
+        'n_train': train_metrics['total'],
+        'n_test': test_metrics['total'],
+        'train': train_metrics,
+        'test': test_metrics,
         'gap': round(float(gap), 4),
         'bias': bias,
         'variance': variance,
@@ -172,7 +174,7 @@ def main():
     std = X_train.std(axis=0)
     lower, upper = mean - 3 * std, mean + 3 * std
     outliers = ((X_train < lower) | (X_train > upper)).sum()
-    print(f'Z-Score: {outliers} values clipped in train ({outliers / X_train.size * 100:.4f}%)')
+    print(f'Z-Score: {outliers} of {X_train.size} values clipped in train ({outliers / X_train.size * 100:.4f}%)')
     X_train = np.clip(X_train, lower, upper)
     X_test = np.clip(X_test, lower, upper)
  
@@ -186,14 +188,16 @@ def main():
     train_pred = model.predict(X_train_scaled)
     test_pred = model.predict(X_test_scaled)
 
-    train_acc = accuracy_score(y_train, train_pred)
-    test_acc = accuracy_score(y_test, test_pred)
     train_f1 = f1_score(y_train, train_pred, average='macro')
     test_f1 = f1_score(y_test, test_pred, average='macro')
 
-    print(f'{"":<12}{"accuracy":>10}{"f1_macro":>10}')
-    print(f'{"train":<12}{train_acc:>10.4f}{train_f1:>10.4f}')
-    print(f'{"test":<12}{test_acc:>10.4f}{test_f1:>10.4f}')
+    print(f'{"":<12}{"accuracy":>10}{"f1_macro":>10}{"correct":>10}{"incorrect":>12}')
+    train_metrics = all_metrics(y_train, train_pred)
+    test_metrics = all_metrics(y_test, test_pred)
+    print(f'{"train":<12}{train_metrics["accuracy"]:>10.4f}{train_f1:>10.4f}'
+          f'{train_metrics["correct"]:>10}{train_metrics["incorrect"]:>12}')
+    print(f'{"test":<12}{test_metrics["accuracy"]:>10.4f}{test_f1:>10.4f}'
+          f'{test_metrics["correct"]:>10}{test_metrics["incorrect"]:>12}')
 
     bias, variance, fit, gap = diagnose(train_f1, test_f1)
     print(f'\ntrain-test f1 gap: {gap:.4f}')
@@ -201,8 +205,7 @@ def main():
     print(f'variance: {variance}')
     print(f'fit: {fit}')
 
-    # full test set together (all 15 classes), not split apart -- this is
-    # what tells you WHICH classes get confused with which
+    # full test set together (all 15 classes), not split apart, for the confusion matrix
     print('\nConfusion matrix (rows=true, columns=predicted):')
     labels = sorted(np.unique(y))
     print(confusion_matrix(y_test, test_pred, labels=labels))
@@ -212,7 +215,7 @@ def main():
     curves = learning_curves(X_train_scaled, y_train, X_test_scaled, y_test)
 
     print()
-    save_web_data(y_train, train_pred, y_test, test_pred, labels, curves)
+    save_web_data(train_metrics, test_metrics, y_test, test_pred, labels, curves)
 
 if __name__ == '__main__':
     main()
